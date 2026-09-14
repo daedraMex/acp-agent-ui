@@ -15,6 +15,8 @@ const OPCIONES: { id: ThemePreference; label: string }[] = [
   { id: "light", label: "claro" },
   { id: "dark", label: "oscuro" },
   { id: "aura", label: "aura" },
+  { id: "cruip-light", label: "cruip claro" },
+  { id: "cruip-dark", label: "cruip oscuro" },
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {

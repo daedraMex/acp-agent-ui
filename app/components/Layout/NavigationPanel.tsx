@@ -1,6 +1,13 @@
 /**
- * Panel de navegación — mismo esqueleto que el del Desktop: items arriba, la
- * lista de chats en medio y Ajustes anclado abajo.
+ * Panel de navegación (Sidebar) — estética Cruip sobre tokens del tema.
+ *
+ * Organismo: contenedor w-64 con fondo --color-sidebar y divisor lateral
+ * --color-border. Moléculas: NavRow (ítem de navegación) y SessionRow
+ * (conversación). Átomos: SidebarIcon para los iconos. Sin colores fijos:
+ * toda la variación claro/oscuro sale de las variables del tema activo.
+ *
+ * Items, IDs, links y handlers intactos: la lista NAV_ITEMS, el estado de
+ * apertura de CHATS y el footer de Ajustes no cambian de comportamiento.
  */
 import { Link, useLocation } from "react-router";
 import { motion } from "motion/react";
@@ -20,6 +27,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "~/lib/utils";
+import { SidebarIcon } from "~/components/Sidebar/atoms/SidebarIcon";
 import type { ConversationSummary } from "~/.server/acp";
 
 interface NavItem {
@@ -47,24 +55,54 @@ const SETTINGS_ITEM: NavItem = {
   icon: Settings,
 };
 
-function NavRow({ item, active }: { item: NavItem; active: boolean }) {
-  const Icon = item.icon;
+/**
+ * Molécula · fila de navegación.
+ * Botón superior (featured): superficie sutil + hover primario sutil.
+ * Ítems: activo → píldora primary-subtle, texto primary-text semibold e
+ * icono primario; inactivo → texto/icono muted con hover a text-main.
+ */
+function NavRow({
+  item,
+  active,
+  featured = false,
+}: {
+  item: NavItem;
+  active: boolean;
+  featured?: boolean;
+}) {
   return (
     <Link
       to={item.path}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-        active
-          ? "bg-background-tertiary text-text-primary"
-          : "text-text-secondary hover:bg-background-secondary hover:text-text-primary"
+        "group flex h-10 items-center gap-3 rounded-xl px-3 text-sm transition-colors duration-150",
+        featured &&
+          "bg-[var(--color-surface-subtle)] font-medium text-[var(--color-text-main)] hover:bg-[var(--color-primary-subtle)]",
+        !featured &&
+          (active
+            ? "bg-[var(--color-primary-subtle)] font-semibold text-[var(--color-primary-text)]"
+            : "text-[var(--color-text-muted)] hover:text-[var(--color-text-main)]")
       )}
     >
-      <Icon className="h-5 w-5 flex-shrink-0 text-text-secondary" />
+      <SidebarIcon
+        icon={item.icon}
+        size={20}
+        active={active && !featured}
+        className={cn(
+          featured && "text-[var(--color-text-main)]",
+          !featured &&
+            active &&
+            "text-[var(--color-primary)]",
+          !featured &&
+            !active &&
+            "text-[var(--color-text-muted)] group-hover:text-[var(--color-text-main)]"
+        )}
+      />
       <span className="truncate">{item.label}</span>
     </Link>
   );
 }
 
+/** Molécula · fila de conversación dentro de CHATS. */
 function SessionRow({
   conversation,
   active,
@@ -77,17 +115,15 @@ function SessionRow({
       to={`/c/${conversation.id}`}
       className={cn(
         "flex flex-col gap-0.5 rounded-lg px-3 py-2 transition-colors",
-        active
-          ? "bg-background-tertiary"
-          : "hover:bg-background-secondary"
+        active ? "bg-[var(--color-primary-subtle)]" : "hover:bg-[var(--color-surface-subtle)]"
       )}
     >
-      <span className="truncate text-sm text-text-primary">
+      <span className="truncate text-sm text-[var(--color-text-main)]">
         {conversation.title}
       </span>
-      <span className="flex items-center gap-2 text-[11px] text-text-tertiary">
+      <span className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
         {conversation.busy && (
-          <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-text-success" />
+          <span className="h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-[var(--color-success-text)]" />
         )}
         {conversation.messageCount} mensajes
       </span>
@@ -95,6 +131,11 @@ function SessionRow({
   );
 }
 
+/**
+ * Organismo · Sidebar de la app.
+ * w-64 h-screen flex-col p-4 con divisor lateral del tema. El ancho final lo
+ * gobierna el contenedor redimensionable de AppLayout (por defecto 256px).
+ */
 export function NavigationPanel({
   conversations,
 }: {
@@ -109,20 +150,28 @@ export function NavigationPanel({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15 }}
-      className="flex h-full flex-col bg-background-primary outline-none"
+      className="flex h-full w-full flex-col border-r border-[var(--color-border)] bg-[var(--color-sidebar)] p-4 outline-none"
     >
+      {/* Espacio para el botón flotante de AppLayout (PanelLeft) */}
       <div className="h-[48px]" />
 
-      <div className="flex flex-col gap-0.5 px-2">
+      {/* Menú principal */}
+      <div className="flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => (
-          <NavRow key={item.id} item={item} active={isActive(item.path)} />
+          <NavRow
+            key={item.id}
+            item={item}
+            active={isActive(item.path)}
+            featured={item.id === "home"}
+          />
         ))}
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 flex-col">
+      {/* Sección CHATS */}
+      <div className="mt-2 flex min-h-0 flex-1 flex-col">
         <button
           onClick={() => setIsChatsExpanded((v) => !v)}
-          className="flex items-center gap-1 self-start px-4 py-1 text-xs font-semibold uppercase tracking-wider text-text-secondary transition-colors hover:text-text-primary"
+          className="mb-2 mt-6 flex items-center gap-1 self-start px-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-caption)] transition-colors hover:text-[var(--color-text-main)]"
         >
           {isChatsExpanded ? (
             <ChevronDown className="h-3 w-3" />
@@ -132,9 +181,9 @@ export function NavigationPanel({
           <span>Chats</span>
         </button>
         {isChatsExpanded && (
-          <div className="mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-2">
             {conversations.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-text-secondary">
+              <div className="px-3 text-xs italic text-[var(--color-text-caption)]">
                 Todavía no hay conversaciones
               </div>
             ) : (
@@ -150,7 +199,8 @@ export function NavigationPanel({
         )}
       </div>
 
-      <div className="border-t border-border-secondary px-2 pb-2 pt-2">
+      {/* Footer: Ajustes anclado abajo */}
+      <div className="mt-auto border-t border-[var(--color-border-subtle)] pt-4">
         <NavRow item={SETTINGS_ITEM} active={isActive(SETTINGS_ITEM.path)} />
       </div>
     </motion.div>

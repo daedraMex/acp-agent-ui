@@ -14,6 +14,7 @@ export default [
   layout("routes/_shell.tsx", [
     index("routes/hub.tsx"),
     route("c/:id", "routes/chat.tsx"),
+    route("sidebar", "routes/sidebar.tsx"),
     route("sessions", "routes/sessions.tsx"),
     route("recipes", "routes/recipes.tsx"),
     route("skills", "routes/skills.tsx"),

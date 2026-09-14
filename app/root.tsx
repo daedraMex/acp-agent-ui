@@ -32,9 +32,11 @@ function tokensToCss(): string {
     block(":root", themes.light.tokens),
     block(".dark", themes.dark.tokens),
     block(".aura", themes.aura.tokens),
+    block(".cruip-light", themes["cruip-light"].tokens),
+    block(".cruip-dark", themes["cruip-dark"].tokens),
     // Sin clase explícita manda la preferencia del sistema.
     `@media (prefers-color-scheme: dark){${block(
-      ":root:not(.light):not(.dark):not(.aura)",
+      ":root:not(.light):not(.dark):not(.aura):not(.cruip-light):not(.cruip-dark)",
       themes.dark.tokens
     )}}`,
   ].join("\n");

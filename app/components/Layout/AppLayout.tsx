@@ -70,7 +70,7 @@ function AppLayoutContent({
   const toggleTitle = open ? "Cerrar navegación" : "Abrir navegación";
 
   return (
-    <div className="relative flex h-dvh w-full flex-1 flex-row bg-background-primary">
+    <div className="relative flex h-dvh w-full flex-1 flex-row bg-[var(--color-canvas)]">
       <div className="absolute left-4 top-[11px] z-40 ml-1.5 flex items-center gap-1">
         <Button
           onClick={toggle}
@@ -106,7 +106,7 @@ function AppLayoutContent({
                   transition={{ type: "spring", stiffness: 400, damping: 40 }}
                   className="fixed inset-y-0 left-0 z-30 w-[min(280px,85vw)] p-2"
                 >
-                  <div className="h-full w-full overflow-hidden rounded-xl border border-border-primary bg-background-primary">
+                  <div className="h-full w-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                     <NavigationPanel conversations={conversations} />
                   </div>
                 </motion.div>
@@ -121,11 +121,9 @@ function AppLayoutContent({
               isDragging ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 40 }
             }
             style={{ height: "100%" }}
-            className="relative h-full flex-shrink-0 overflow-hidden p-2"
+            className="relative h-full flex-shrink-0 overflow-hidden"
           >
-            <div className="h-full w-full overflow-hidden rounded-xl border border-border-primary">
-              <NavigationPanel conversations={conversations} />
-            </div>
+            <NavigationPanel conversations={conversations} />
             {isNavExpanded && (
               <div
                 className="absolute right-0 top-0 h-full w-2 cursor-col-resize transition-colors hover:bg-border-primary/30"

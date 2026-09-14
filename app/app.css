@@ -56,6 +56,35 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   2.5 SIDEBAR TOKEN REGISTRATION — @theme inline {}
+   Registra los tokens semánticos del Sidebar (Atomic Design) con var()
+   autorreferencial: Tailwind genera las utilidades (bg-primary-subtle,
+   text-text-main…) y los VALORES los pone theme-tokens.ts por tema
+   (light/dark/aura) — misma técnica que la sección 3.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-subtle: var(--color-primary-subtle);
+  --color-primary-text: var(--color-primary-text);
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-subtle: var(--color-surface-subtle);
+  --color-sidebar: var(--color-sidebar);
+  --color-border: var(--color-border);
+  --color-border-subtle: var(--color-border-subtle);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-caption: var(--color-text-caption);
+  --color-badge-bg: var(--color-badge-bg);
+  --color-badge-text: var(--color-badge-text);
+  --color-success-bg: var(--color-success-bg);
+  --color-success-text: var(--color-success-text);
+  --color-danger-bg: var(--color-danger-bg);
+  --color-danger-text: var(--color-danger-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    3. MCP SEMANTIC TOKEN REGISTRATION — @theme inline {}
    Registers every McpUiStyleVariableKey so Tailwind generates utility classes.
    Self-referential var() for colors, `initial` for non-color tokens.
@@ -151,10 +180,11 @@
   --border-width-regular: initial;
 
   /* Shadows */
-  --shadow-hairline: initial;
-  --shadow-sm: initial;
-  --shadow-md: initial;
-  --shadow-lg: initial;
+  --shadow-hairline: var(--shadow-hairline);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

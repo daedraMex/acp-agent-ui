@@ -10,7 +10,7 @@ export function MainPanelLayout({
   return (
     <div className="h-dvh">
       <div
-        className={`flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background-primary ${
+        className={`flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--color-canvas)] ${
           removeTopPadding ? "" : "pt-[32px]"
         }`}
       >

@@ -139,6 +139,7 @@ const lightColorTokens: ColorTokens = {
 
   // Shadows
   '--shadow-hairline': '0 0 0 1px rgba(0, 0, 0, 0.05)',
+  '--shadow-xs': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
   '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
   '--shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
   '--shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
@@ -195,6 +196,7 @@ const darkColorTokens: ColorTokens = {
 
   // Shadows (darker for dark mode)
   '--shadow-hairline': '0 0 0 1px rgba(0, 0, 0, 0.2)',
+  '--shadow-xs': '0 1px 2px 0 rgba(0, 0, 0, 0.2)',
   '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.2)',
   '--shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2)',
   '--shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2)',
@@ -253,10 +255,125 @@ const auraColorTokens: ColorTokens = {
 
   // Shadows (dark)
   '--shadow-hairline': '0 0 0 1px rgba(0, 0, 0, 0.2)',
+  '--shadow-xs': '0 1px 2px 0 rgba(0, 0, 0, 0.2)',
   '--shadow-sm': '0 1px 2px 0 rgba(0, 0, 0, 0.2)',
   '--shadow-md': '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2)',
   '--shadow-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2)',
 };
+
+// ---------------------------------------------------------------------------
+// Cruip theme — color tokens MCP (light & dark).
+// Paleta slate + índigo del spec: canvas #F8FAFC, superficies blancas,
+// acento #6366F1. Dark: slate 900/800 y acento índigo claro.
+// ---------------------------------------------------------------------------
+const cruipLightColorTokens: ColorTokens = {
+  // Backgrounds
+  '--color-background-primary': '#ffffff',
+  '--color-background-secondary': '#f8fafc',
+  '--color-background-tertiary': '#f1f5f9',
+  '--color-background-inverse': '#0f172a',
+  '--color-background-ghost': 'transparent',
+  '--color-background-info': '#e0f2fe',
+  '--color-background-danger': '#ffe4e6',
+  '--color-background-success': '#dcfce7',
+  '--color-background-warning': '#fef9c3',
+  '--color-background-disabled': '#f1f5f9',
+
+  // Text
+  '--color-text-primary': '#0f172a',
+  '--color-text-secondary': '#64748b',
+  '--color-text-tertiary': '#94a3b8',
+  '--color-text-inverse': '#ffffff',
+  '--color-text-ghost': '#64748b',
+  '--color-text-info': '#0369a1',
+  '--color-text-danger': '#be123c',
+  '--color-text-success': '#15803d',
+  '--color-text-warning': '#a16207',
+  '--color-text-disabled': '#cbd5e1',
+
+  // Borders
+  '--color-border-primary': '#e2e8f0',
+  '--color-border-secondary': '#f1f5f9',
+  '--color-border-tertiary': '#cbd5e1',
+  '--color-border-inverse': '#0f172a',
+  '--color-border-ghost': 'transparent',
+  '--color-border-info': '#bae6fd',
+  '--color-border-danger': '#fecdd3',
+  '--color-border-success': '#bbf7d0',
+  '--color-border-warning': '#fef08a',
+  '--color-border-disabled': '#e2e8f0',
+
+  // Rings
+  '--color-ring-primary': '#e2e8f0',
+  '--color-ring-secondary': '#cbd5e1',
+  '--color-ring-inverse': '#ffffff',
+  '--color-ring-info': '#7dd3fc',
+  '--color-ring-danger': '#fda4af',
+  '--color-ring-success': '#86efac',
+  '--color-ring-warning': '#fde047',
+
+  // Shadows
+  '--shadow-hairline': '0 0 0 1px rgba(15, 23, 42, 0.05)',
+  '--shadow-xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+  '--shadow-sm': '0 1px 1px 0 rgb(0 0 0 / 0.05), 0 1px 2px 0 rgb(0 0 0 / 0.02)',
+  '--shadow-md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+  '--shadow-lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+};
+
+const cruipDarkColorTokens: ColorTokens = {
+  // Backgrounds
+  '--color-background-primary': '#1e293b',
+  '--color-background-secondary': '#0f172a',
+  '--color-background-tertiary': '#334155',
+  '--color-background-inverse': '#f8fafc',
+  '--color-background-ghost': 'transparent',
+  '--color-background-info': 'rgba(56, 189, 248, 0.15)',
+  '--color-background-danger': 'rgba(244, 63, 94, 0.2)',
+  '--color-background-success': 'rgba(34, 197, 94, 0.2)',
+  '--color-background-warning': 'rgba(250, 204, 21, 0.2)',
+  '--color-background-disabled': '#334155',
+
+  // Text
+  '--color-text-primary': '#f8fafc',
+  '--color-text-secondary': '#94a3b8',
+  '--color-text-tertiary': '#64748b',
+  '--color-text-inverse': '#0f172a',
+  '--color-text-ghost': '#94a3b8',
+  '--color-text-info': '#7dd3fc',
+  '--color-text-danger': '#fb7185',
+  '--color-text-success': '#4ade80',
+  '--color-text-warning': '#facc15',
+  '--color-text-disabled': '#475569',
+
+  // Borders
+  '--color-border-primary': '#334155',
+  '--color-border-secondary': '#1e293b',
+  '--color-border-tertiary': '#475569',
+  '--color-border-inverse': '#f8fafc',
+  '--color-border-ghost': 'transparent',
+  '--color-border-info': 'rgba(56, 189, 248, 0.4)',
+  '--color-border-danger': 'rgba(244, 63, 94, 0.4)',
+  '--color-border-success': 'rgba(34, 197, 94, 0.4)',
+  '--color-border-warning': 'rgba(250, 204, 21, 0.4)',
+  '--color-border-disabled': '#334155',
+
+  // Rings
+  '--color-ring-primary': '#475569',
+  '--color-ring-secondary': '#334155',
+  '--color-ring-inverse': '#0f172a',
+  '--color-ring-info': '#7dd3fc',
+  '--color-ring-danger': '#fb7185',
+  '--color-ring-success': '#4ade80',
+  '--color-ring-warning': '#facc15',
+
+  // Shadows (más fuertes para fondo oscuro)
+  '--shadow-hairline': '0 0 0 1px rgba(0, 0, 0, 0.3)',
+  '--shadow-xs': '0 1px 2px 0 rgb(0 0 0 / 0.3)',
+  '--shadow-sm': '0 1px 1px 0 rgb(0 0 0 / 0.3), 0 1px 2px 0 rgb(0 0 0 / 0.2)',
+  '--shadow-md': '0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3)',
+  '--shadow-lg': '0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3)',
+};
+
 
 // Aura is monospace-first — override the shared sans family.
 const auraFontTokens: Partial<Pick<ThemeTokens, BaseTokenKey>> = {
@@ -265,23 +382,150 @@ const auraFontTokens: Partial<Pick<ThemeTokens, BaseTokenKey>> = {
 };
 
 // ---------------------------------------------------------------------------
+// UI tokens — set semántico canónico consumido por componentes (Atomic Design).
+// Nombres del spec: primary/hover/subtle/text, canvas, surface, sidebar,
+// border/subtle, text-main/muted/caption, badge-bg/text, success/danger.
+// Todos los temas definen el set completo para que los componentes nunca
+// queden sin valor; el registro de utilidades está en app.css (sección 2.5).
+// ---------------------------------------------------------------------------
+const uiLightTokens: ThemeTokens = {
+  '--color-primary': '#5c98f9',
+  '--color-primary-hover': '#4a87ef',
+  '--color-primary-subtle': 'rgba(92, 152, 249, 0.10)',
+  '--color-primary-text': '#4a87ef',
+  '--color-canvas': '#f4f6f7',
+  '--color-surface': '#ffffff',
+  '--color-surface-subtle': '#f4f6f7',
+  '--color-sidebar': '#ffffff',
+  '--color-border': '#e3e6ea',
+  '--color-border-subtle': '#f4f6f7',
+  '--color-text-main': '#3f434b',
+  '--color-text-muted': '#878787',
+  '--color-text-caption': '#a7b0b9',
+  '--color-badge-bg': '#5c98f9',
+  '--color-badge-text': '#ffffff',
+  '--color-success-bg': '#dcfce7',
+  '--color-success-text': '#15803d',
+  '--color-danger-bg': '#ffe4e6',
+  '--color-danger-text': '#be123c',
+};
+
+const uiDarkTokens: ThemeTokens = {
+  '--color-primary': '#818cf8',
+  '--color-primary-hover': '#9c8cff',
+  '--color-primary-subtle': 'rgba(129, 140, 248, 0.16)',
+  '--color-primary-text': '#a5b4fc',
+  '--color-canvas': '#22252a',
+  '--color-surface': '#3f434b',
+  '--color-surface-subtle': '#474e57',
+  '--color-sidebar': '#22252a',
+  '--color-border': '#3f434b',
+  '--color-border-subtle': '#474e57',
+  '--color-text-main': '#ffffff',
+  '--color-text-muted': '#878787',
+  '--color-text-caption': '#606c7a',
+  '--color-badge-bg': '#818cf8',
+  '--color-badge-text': '#ffffff',
+  '--color-success-bg': 'rgba(34, 197, 94, 0.2)',
+  '--color-success-text': '#a3d795',
+  '--color-danger-bg': 'rgba(244, 63, 94, 0.2)',
+  '--color-danger-text': '#ff6b6b',
+};
+
+const uiAuraTokens: ThemeTokens = {
+  '--color-primary': '#a277ff',
+  '--color-primary-hover': '#b08cff',
+  '--color-primary-subtle': 'rgba(162, 119, 255, 0.14)',
+  '--color-primary-text': '#b08cff',
+  '--color-canvas': '#15141b',
+  '--color-surface': '#1a1921',
+  '--color-surface-subtle': '#201e2b',
+  '--color-sidebar': '#15141b',
+  '--color-border': '#2d2b38',
+  '--color-border-subtle': '#201e2b',
+  '--color-text-main': '#edecee',
+  '--color-text-muted': '#8a8282',
+  '--color-text-caption': '#6d6d6d',
+  '--color-badge-bg': '#a277ff',
+  '--color-badge-text': '#15141b',
+  '--color-success-bg': 'rgba(97, 255, 202, 0.15)',
+  '--color-success-text': '#61ffca',
+  '--color-danger-bg': 'rgba(255, 103, 103, 0.15)',
+  '--color-danger-text': '#ff6767',
+};
+
+const uiCruipLightTokens: ThemeTokens = {
+  '--color-primary': '#6366f1',
+  '--color-primary-hover': '#4f46e5',
+  '--color-primary-subtle': '#eef2ff',
+  '--color-primary-text': '#4f46e5',
+  '--color-canvas': '#f8fafc',
+  '--color-surface': '#ffffff',
+  '--color-surface-subtle': '#f1f5f9',
+  '--color-sidebar': '#ffffff',
+  '--color-border': '#e2e8f0',
+  '--color-border-subtle': '#f1f5f9',
+  '--color-text-main': '#0f172a',
+  '--color-text-muted': '#64748b',
+  '--color-text-caption': '#94a3b8',
+  '--color-badge-bg': '#818cf8',
+  '--color-badge-text': '#ffffff',
+  '--color-success-bg': '#dcfce7',
+  '--color-success-text': '#15803d',
+  '--color-danger-bg': '#ffe4e6',
+  '--color-danger-text': '#be123c',
+};
+
+const uiCruipDarkTokens: ThemeTokens = {
+  '--color-primary': '#6366f1',
+  '--color-primary-hover': '#818cf8',
+  '--color-primary-subtle': 'rgba(99, 102, 241, 0.15)',
+  '--color-primary-text': '#a5b4fc',
+  '--color-canvas': '#0f172a',
+  '--color-surface': '#1e293b',
+  '--color-surface-subtle': '#334155',
+  '--color-sidebar': '#1e293b',
+  '--color-border': '#334155',
+  '--color-border-subtle': '#1e293b',
+  '--color-text-main': '#f8fafc',
+  '--color-text-muted': '#94a3b8',
+  '--color-text-caption': '#64748b',
+  '--color-badge-bg': '#6366f1',
+  '--color-badge-text': '#ffffff',
+  '--color-success-bg': 'rgba(34, 197, 94, 0.2)',
+  '--color-success-text': '#4ade80',
+  '--color-danger-bg': 'rgba(244, 63, 94, 0.2)',
+  '--color-danger-text': '#fb7185',
+};
+
+// ---------------------------------------------------------------------------
 // Merged token maps — used by applyThemeTokens() and buildMcpHostStyles()
 // ---------------------------------------------------------------------------
-export const lightTokens: ThemeTokens = { ...baseTokens, ...lightColorTokens };
-export const darkTokens: ThemeTokens = { ...baseTokens, ...darkColorTokens };
+export const lightTokens: ThemeTokens = { ...baseTokens, ...lightColorTokens, ...uiLightTokens };
+export const darkTokens: ThemeTokens = { ...baseTokens, ...darkColorTokens, ...uiDarkTokens };
 export const auraTokens: ThemeTokens = {
   ...baseTokens,
   ...(auraFontTokens as ThemeTokens),
   ...auraColorTokens,
+  ...uiAuraTokens,
 };
-
+export const cruipLightTokens: ThemeTokens = {
+  ...baseTokens,
+  ...cruipLightColorTokens,
+  ...uiCruipLightTokens,
+};
+export const cruipDarkTokens: ThemeTokens = {
+  ...baseTokens,
+  ...cruipDarkColorTokens,
+  ...uiCruipDarkTokens,
+};
 // ---------------------------------------------------------------------------
 // Theme registry — the set of selectable named themes.
 // `variant` drives the .dark/.light class and colorScheme for anything outside
 // the token system; `tokens` is the map applied to :root. Adding a future theme
 // is a single entry here plus its token map above.
 // ---------------------------------------------------------------------------
-export type ThemeId = 'light' | 'dark' | 'aura';
+export type ThemeId = 'light' | 'dark' | 'aura' | 'cruip-light' | 'cruip-dark';
 export type ThemeVariant = 'light' | 'dark';
 
 interface ThemeDefinition {
@@ -293,6 +537,8 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   light: { variant: 'light', tokens: lightTokens },
   dark: { variant: 'dark', tokens: darkTokens },
   aura: { variant: 'dark', tokens: auraTokens },
+  'cruip-light': { variant: 'light', tokens: cruipLightTokens },
+  'cruip-dark': { variant: 'dark', tokens: cruipDarkTokens },
 };
 
 // ---------------------------------------------------------------------------
@@ -368,6 +614,8 @@ export function getResolvedTheme(): ThemeId {
   }
   const stored = localStorage.getItem('theme');
   if (stored === 'aura') return 'aura';
+  if (stored === 'cruip-light') return 'cruip-light';
+  if (stored === 'cruip-dark') return 'cruip-dark';
   return stored === 'dark' ? 'dark' : 'light';
 }
 

@@ -13,7 +13,7 @@ import {
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 420;
-const DEFAULT_WIDTH = 260;
+const DEFAULT_WIDTH = 256;
 
 interface NavigationContextValue {
   isNavExpanded: boolean;

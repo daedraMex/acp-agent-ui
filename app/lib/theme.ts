@@ -3,13 +3,18 @@
  * poder escribir la clase correcta en el HTML. Leerla en el cliente después de
  * pintar provoca un desajuste de hidratación y la página se cae.
  */
-export type ThemeId = "light" | "dark" | "aura";
+export type ThemeId = "light" | "dark" | "aura" | "cruip-light" | "cruip-dark";
 export type ThemePreference = ThemeId | "system";
 
 export const THEME_COOKIE = "theme";
 
 export function parseTheme(value: string | null | undefined): ThemePreference {
-  return value === "light" || value === "dark" || value === "aura" || value === "system"
+  return value === "light" ||
+    value === "dark" ||
+    value === "aura" ||
+    value === "cruip-light" ||
+    value === "cruip-dark" ||
+    value === "system"
     ? value
     : "system";
 }
@@ -33,7 +38,7 @@ export function themeClass(preference: ThemePreference): string {
 export function applyTheme(preference: ThemePreference) {
   document.cookie = `${THEME_COOKIE}=${preference}; path=/; max-age=31536000; samesite=lax`;
   const root = document.documentElement;
-  root.classList.remove("light", "dark", "aura");
+  root.classList.remove("light", "dark", "aura", "cruip-light", "cruip-dark");
   const cls = themeClass(preference);
   if (cls) root.classList.add(cls);
 }

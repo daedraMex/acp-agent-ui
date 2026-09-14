@@ -67,10 +67,10 @@ export function ChatInput({
             submit();
           }
         }}
-        className="max-h-60 min-h-[24px] w-full flex-none resize-none overflow-y-auto bg-transparent px-1 text-sm leading-6 text-text-primary outline-none placeholder:text-text-tertiary"
+        className="max-h-60 min-h-[24px] w-full flex-none resize-none overflow-y-auto bg-transparent px-1 text-sm leading-6 text-[var(--color-text-main)] outline-none placeholder:text-[var(--color-text-caption)]"
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-[11px] text-text-tertiary">
+        <span className="truncate font-mono text-[11px] text-[var(--color-text-caption)]">
           {workingDir}
         </span>
         <button

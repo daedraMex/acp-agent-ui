@@ -3,6 +3,7 @@
  * ocurre del lado del servidor; aquí sólo llegan eventos ya traducidos.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useModelSelector } from "~/context/ModelContext";
 
 /** Por dónde va la conexión con el agente antes del primer `started`. */
 export type ConnectPhase = "waking" | "connecting" | "session";
@@ -18,6 +19,7 @@ export interface ToolEntry {
 export interface Turn {
   role: "user" | "assistant";
   text: string;
+  at?: number;
   thought?: string;
   tools?: ToolEntry[];
   usage?: { used: number; size: number; cost: number };
@@ -100,18 +102,20 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
     return () => es.close();
   }, [conversationId]);
 
+  const { activeModelId } = useModelSelector();
+
   const send = useCallback(
     async (text: string) => {
-      setTurns((prev) => [...prev, { role: "user", text }]);
+      setTurns((prev) => [...prev, { role: "user", text, at: Date.now() }]);
       setBusy(true);
       streaming.current = false;
       await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, modelId: activeModelId }),
       });
     },
-    [conversationId]
+    [conversationId, activeModelId]
   );
 
   return { turns, busy, connected, phase, error, usage, send };

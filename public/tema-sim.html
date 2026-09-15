@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sim · Sistema de temas — parque low-poly</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #0b1220; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  #scene { position: fixed; inset: 0; }
+  .panel {
+    position: fixed; z-index: 10; background: rgba(13, 18, 30, 0.88);
+    border: 1px solid #334155; border-radius: 14px; padding: 12px 14px;
+    color: #e2e8f0; backdrop-filter: blur(6px);
+  }
+  #title { top: 14px; left: 14px; max-width: 320px; }
+  #title h1 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+  #title p { margin: 6px 0 0; font-size: 11px; color: #94a3b8; line-height: 1.5; }
+  #steps { top: 14px; right: 14px; min-width: 250px; }
+  #steps h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; }
+  .step { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 11px; color: #64748b; transition: all .2s; }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; background: #334155; flex-shrink: 0; }
+  .step.active { color: #f8fafc; background: rgba(99, 102, 241, 0.18); }
+  .step.active .dot { background: #6366f1; box-shadow: 0 0 8px #6366f1; }
+  #controls { bottom: 14px; left: 14px; display: flex; flex-wrap: wrap; gap: 8px; max-width: 460px; }
+  .theme-btn {
+    border: 1px solid #334155; border-radius: 999px; padding: 7px 14px;
+    font: inherit; font-size: 11px; color: #cbd5e1; background: rgba(30, 41, 59, 0.7); cursor: pointer;
+    transition: all .15s; letter-spacing: 0.02em;
+  }
+  .theme-btn:hover { border-color: #818cf8; }
+  .theme-btn.active { border-color: var(--accent, #6366f1); color: #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #6366f1) 55%, transparent); }
+  #readout { bottom: 14px; right: 14px; min-width: 240px; font-size: 11px; }
+  #readout h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; }
+  #readout .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: #94a3b8; }
+  #readout .row b { color: #e2e8f0; font-weight: 600; }
+  #hint { bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #64748b; padding: 6px 12px; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="panel" id="title">
+  <h1>🏗️ Parque del Sistema de Temas</h1>
+  <p>Cinco atracciones (light · dark · aura · cruip-light · cruip-dark). El carrito del token recorre el pipeline: <b>cookie</b> → <b>clase en &lt;html&gt;</b> → <b>tokens CSS</b> → <b>componentes repintados</b>. Cambia el tema y el parque se repinta con sus valores reales.</p>
+</div>
+
+<div class="panel" id="steps">
+  <h2>Pipeline del token</h2>
+  <div class="step" data-step="0"><span class="dot"></span>cookie: theme=<span id="step-cookie">…</span></div>
+  <div class="step" data-step="1"><span class="dot"></span>clase en &lt;html&gt; (root.tsx)</div>
+  <div class="step" data-step="2"><span class="dot"></span>tokens CSS por clase</div>
+  <div class="step" data-step="3"><span class="dot"></span>componentes repintados</div>
+</div>
+
+<div class="panel" id="controls" aria-label="Selector de tema"></div>
+
+<div class="panel" id="readout">
+  <h2>Tokens activos</h2>
+  <div class="row"><span>--color-primary</span><b id="t-primary">…</b></div>
+  <div class="row"><span>--color-canvas</span><b id="t-canvas">…</b></div>
+  <div class="row"><span>--color-surface</span><b id="t-surface">…</b></div>
+  <div class="row"><span>--color-text-main</span><b id="t-text">…</b></div>
+</div>
+
+<div class="panel" id="hint">arrastra para orbitar · rueda para zoom · clic en un tema para repintar el parque</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ── Paletas reales del sistema de temas (app/theme/theme-tokens.ts) ─────── */
+const THEMES = {
+  "light":       { label: "claro",       primary: "#5c98f9", canvas: "#f4f6f7", surface: "#ffffff", sidebar: "#ffffff", textMain: "#3f434b", sky: 0xbfd9f0 },
+  "dark":        { label: "oscuro",      primary: "#818cf8", canvas: "#22252a", surface: "#3f434b", sidebar: "#22252a", textMain: "#ffffff", sky: 0x1b2230 },
+  "aura":        { label: "aura",        primary: "#a277ff", canvas: "#15141b", surface: "#1a1921", sidebar: "#15141b", textMain: "#edecee", sky: 0x181421 },
+  "cruip-light": { label: "cruip claro", primary: "#6366f1", canvas: "#f8fafc", surface: "#ffffff", sidebar: "#ffffff", textMain: "#0f172a", sky: 0xcfe3f5 },
+  "cruip-dark":  { label: "cruip oscuro",primary: "#6366f1", canvas: "#0f172a", surface: "#1e293b", sidebar: "#1e293b", textMain: "#f8fafc", sky: 0x0b1220 },
+};
+const ZONES = ["light", "dark", "aura", "cruip-light", "cruip-dark"];
+let current = "cruip-light";
+
+/* ── Renderer / cámara / escena ──────────────────────────────────────────── */
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(THEMES[current].sky, 45, 130);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(26, 19, 26);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 1, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minPolarAngle = 0.35;
+controls.maxPolarAngle = 1.15;
+controls.minDistance = 12;
+controls.maxDistance = 70;
+
+/* luces */
+const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a4a3a, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d6, 1.6);
+sun.position.set(18, 26, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+sun.shadow.camera.far = 120;
+scene.add(sun);
+
+/* ── utilidades low-poly ─────────────────────────────────────────────────── */
+const mat = (color, opts = {}) =>
+  new THREE.MeshStandardMaterial({ color, flatShading: true, ...opts });
+
+function box(w, h, d, color, { x = 0, y = 0, z = 0, cast = true, receive = true } = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = cast; m.receiveShadow = receive;
+  scene.add(m);
+  return m;
+}
+
+function cone(r, h, color, seg = 8, { x = 0, y = 0, z = 0 } = {}) {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+function makeLabel(text, fg = "#e2e8f0", bg = "rgba(15,23,42,0.85)") {
+  const cv = document.createElement("canvas");
+  cv.width = 512; cv.height = 128;
+  const g = cv.getContext("2d");
+  g.fillStyle = bg; g.beginPath();
+  g.roundRect(8, 8, 496, 112, 26); g.fill();
+  g.fillStyle = fg; g.font = "bold 52px ui-monospace, monospace";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 256, 68);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sp.scale.set(4.4, 1.1, 1);
+  return sp;
+}
+
+/* ── terreno RCT: césped, tablero de camino, lago ─────────────────────────── */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(140, 140),
+  new THREE.MeshLambertMaterial({ color: 0x5f9e4e })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+for (let i = 0; i < 10; i++) {
+  const t = box(1.6, 0.06, 1.6, i % 2 ? 0x6fb563 : 0x69ac5e, {
+    x: -11.5 + i * 2.55, y: 0.03, z: 5.6, cast: false });
+  t.rotation.y = 0.785;
+}
+
+const lake = box(16, 0.1, 9, 0x3f7fb8, { x: 22, y: 0.05, z: 6, cast: false, receive: false });
+lake.position.y = 0.04;
+
+/* árboles low-poly */
+const treeSpots = [];
+while (treeSpots.length < 34) {
+  const x = -30 + rnd() * 60, z = -18 + rnd() * 36;
+  if (Math.abs(x) < 13 && Math.abs(z) < 7) continue;
+  if (Math.abs(x - 22) < 9 && Math.abs(z - 6) < 5) continue;
+  treeSpots.push([x, z]);
+}
+const treeGroup = new THREE.Group();
+for (const [x, z] of treeSpots) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.9, 6), mat(0x7a5230));
+  trunk.position.y = 0.45; trunk.castShadow = true;
+  const c1 = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.7, 7), mat(rnd() > 0.35 ? 0x2f7d3a : 0x3a8f45));
+  c1.position.y = 1.6; c1.castShadow = true;
+  const c2 = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.2, 7), mat(0x49a653));
+  c2.position.y = 2.55; c2.castShadow = true;
+  g.add(trunk, c1, c2);
+  g.position.set(x, 0, z);
+  g.scale.setScalar(0.7 + rnd() * 0.8);
+  treeGroup.add(g);
+}
+scene.add(treeGroup);
+
+/* ── los 5 pads de tema ──────────────────────────────────────────────────── */
+const pads = [];
+ZONES.forEach((id, i) => {
+  const t = THEMES[id];
+  const x = -13 + i * 6.5;
+  const pad = new THREE.Group();
+  pad.position.set(x, 0, 0);
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.35, 3.6), mat(t.canvas));
+  base.position.y = 0.18; base.receiveShadow = true; base.castShadow = true;
+  const building = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.5, 1.7), mat(t.surface));
+  building.position.y = 0.35 + 0.75; building.castShadow = true; building.receiveShadow = true;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.0, 4), mat(t.primary));
+  roof.position.y = 1.85 + 0.5; roof.rotation.y = Math.PI / 4; roof.castShadow = true;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5), mat(0x9aa4b2));
+  pole.position.set(1.7, 1.2, 1.2);
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.9, 3), mat(t.primary));
+  flag.position.set(2.05, 2.3, 1.2); flag.rotation.z = Math.PI / 2;
+  const label = makeLabel(id);
+  label.position.set(0, 3.3, 0);
+  pad.add(base, building, roof, pole, flag, label);
+  scene.add(pad);
+  pads.push({ id, pad, base, building, roof, flag, label });
+});
+
+/* ── montaña rusa del token ──────────────────────────────────────────────── */
+const pts = ZONES.map((_, i) => new THREE.Vector3(-13 + i * 6.5, 2.4 + (i % 2) * 1.1, 0));
+const curve = new THREE.CatmullRomCurve3(pts, true, "catmullrom", 0.6);
+const tube = new THREE.Mesh(
+  new THREE.TubeGeometry(curve, 220, 0.13, 8, true),
+  mat(0x8a93a5)
+);
+tube.receiveShadow = true;
+scene.add(tube);
+
+for (let i = 0; i <= 100; i += 4) {
+  const p = curve.getPointAt(i / 100);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, p.y, 5), mat(0x6b7280));
+  pole.position.set(p.x, p.y / 2, p.z);
+  pole.castShadow = true;
+  scene.add(pole);
+}
+
+/* puertas del pipeline en 4 puntos del recorrido */
+const gates = [0, 0.25, 0.5, 0.75].map((t) => {
+  const p = curve.getPointAt(t);
+  const g = new THREE.Group();
+  g.position.copy(p);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.22, 0.22), mat(0xf1f5f9));
+  bar.position.y = 1.6;
+  const l = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 3.4, 5), mat(0xcbd5e1));
+  l.position.set(-0.95, 1.7, 0);
+  const r = l.clone(); r.position.x = 0.95;
+  g.add(bar, l, r);
+  scene.add(g);
+  return g;
+});
+
+/* carrito + token */
+const cart = new THREE.Group();
+const cartBody = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.45, 0.6), mat(THEMES[current].surface));
+cartBody.castShadow = true;
+const token = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), mat(THEMES[current].primary));
+token.position.y = 0.4;
+token.castShadow = true;
+cart.add(cartBody, token);
+scene.add(cart);
+
+/* ── repintar el parque con el tema activo ────────────────────────────────── */
+function applyTheme(id) {
+  current = id;
+  const t = THEMES[id];
+  scene.background = new THREE.Color(t.sky);
+  scene.fog.color.set(t.sky);
+  for (const p of pads) {
+    const pt = THEMES[p.id];
+    p.base.material.color.set(pt.canvas);
+    p.building.material.color.set(pt.surface);
+    p.roof.material.color.set(pt.primary);
+    p.flag.material.color.set(pt.primary);
+  }
+  cartBody.material.color.set(t.surface);
+  token.material.color.set(t.primary);
+  document.getElementById("step-cookie").textContent = id;
+  document.getElementById("t-primary").textContent = t.primary;
+  document.getElementById("t-canvas").textContent = t.canvas;
+  document.getElementById("t-surface").textContent = t.surface;
+  document.getElementById("t-text").textContent = t.textMain;
+}
+
+/* ── UI de temas ─────────────────────────────────────────────────────────── */
+const controlsEl = document.getElementById("controls");
+const order = ["light", "dark", "aura", "cruip-light", "cruip-dark"];
+for (const id of order) {
+  const b = document.createElement("button");
+  b.className = "theme-btn";
+  b.textContent = THEMES[id].label;
+  b.style.setProperty("--accent", THEMES[id].primary);
+  b.onclick = () => {
+    applyTheme(id);
+    [...controlsEl.children].forEach((c) => c.classList.toggle("active", c === b));
+  };
+  controlsEl.appendChild(b);
+}
+controlsEl.children[order.indexOf("cruip-light")].classList.add("active");
+
+/* ── loop: carrito por la pista + paso activo del pipeline ────────────────── */
+let t = 0;
+const clock = new THREE.Clock();
+const stepsEl = [...document.querySelectorAll(".step")];
+
+function animate() {
+  const dt = clock.getDelta();
+  t = (t + dt * 0.035) % 1;
+  const p = curve.getPointAt(t);
+  const tangent = curve.getTangentAt(t);
+  cart.position.copy(p);
+  cart.position.y += 0.55;
+  cart.lookAt(p.clone().add(tangent));
+
+  const step = Math.floor(((t + 0.001) * 4) % 4);
+  stepsEl.forEach((el, i) => el.classList.toggle("active", i === step));
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+applyTheme(current);
+animate();
+</script>
+</body>
+</html>

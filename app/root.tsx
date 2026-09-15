@@ -12,6 +12,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { themes } from "./theme/theme-tokens";
 import { themeClass, themeFromCookies } from "./lib/theme";
+import { ModelProvider } from "./context/ModelContext";
 
 export function loader({ request }: Route.LoaderArgs) {
   return { theme: themeFromCookies(request.headers.get("cookie")) };
@@ -69,7 +70,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <ModelProvider>
+      <Outlet />
+    </ModelProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

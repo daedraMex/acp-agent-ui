@@ -4,9 +4,9 @@ import type { Route } from "./+types/api.conversations.$id.messages";
 import { askConversation } from "~/.server/acp";
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const body = (await request.json()) as { text?: string };
+  const body = (await request.json()) as { text?: string; modelId?: string };
   if (!body.text) return data({ error: "no text" }, { status: 400 });
-  const ok = askConversation(params.id, String(body.text));
+  const ok = askConversation(params.id, String(body.text), body.modelId);
   if (!ok) return data({ error: "conversation not found" }, { status: 404 });
   return data({ queued: true });
 }

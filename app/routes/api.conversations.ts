@@ -12,7 +12,16 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: "method not allowed" }, { status: 405 });
   }
   try {
-    const id = await createConversation();
+    // El modelo elegido en el Selector de Modelo viaja opcional: si viene,
+    // la sesión lo guarda (seam de inyección; el motor final lo decide la caja).
+    let modelId: string | undefined;
+    try {
+      const body = (await request.json()) as { modelId?: string };
+      modelId = body.modelId;
+    } catch {
+      // sin body: comportamiento anterior intacto
+    }
+    const id = await createConversation(modelId);
     return data({ conversationId: id });
   } catch (e) {
     return data({ error: (e as Error).message }, { status: 429 });

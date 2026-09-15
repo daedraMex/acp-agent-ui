@@ -166,6 +166,7 @@ export interface StoredMessage {
 // ---------------------------------------------------------------------------
 class GooseSession extends EventEmitter {
   sessionId: string | null = null;
+  modelId: string | null = null;
   busy = false;
   ready = false;
   closed = false;
@@ -181,6 +182,7 @@ class GooseSession extends EventEmitter {
 
   private conn: any = null;
   private session: any = null;
+  private ctx: any = null;
   private queue: string[] = [];
   private idleTimer: NodeJS.Timeout | null = null;
   private current: string | null = null;
@@ -287,6 +289,7 @@ class GooseSession extends EventEmitter {
 
     this.conn = app.connect(stream);
     const ctx = this.conn.agent;
+    this.ctx = ctx;
 
     await ctx.request("initialize", {
       protocolVersion: 1,
@@ -302,19 +305,50 @@ class GooseSession extends EventEmitter {
     this.session = await ctx.buildSession({ cwd: this.cwd, mcpServers: [] }).start();
     this.sessionId = this.session.sessionId;
     this.ready = true;
+    // Selección del Selector de Modelo: se aplica al agente vía el método
+    // estándar session/set_config_option (configId "model"). Si el agente
+    // no lo soporta o no conoce el id, seguimos con su modelo por defecto.
+    if (this.modelId) await this.setModel(this.modelId);
     this.emit("event", { type: "started", sessionId: this.sessionId });
     this.resetIdle();
     this.pump();
   }
 
-  ask(text: string) {
+  ask(text: string, modelId?: string) {
     if (this.closed) return;
     this.resetIdle();
     this.messages.push({ role: "user", text, at: Date.now() });
     if (this.messages.length === 1) this.title = text.slice(0, 60);
     this.updatedAt = Date.now();
     this.queue.push(text);
-    this.pump();
+    // El cambio de modelo debe aterrizar ANTES de que salga el turno; si
+    // falla, el turno sale con el modelo actual y no se pierde el mensaje.
+    if (modelId && modelId !== this.modelId) {
+      void this.setModel(modelId).finally(() => this.pump());
+    } else {
+      this.pump();
+    }
+  }
+
+  /**
+   * Aplica el modelo elegido en la sesión del agente (session/set_config_option).
+   * Agnóstico: si el agente no implementa el método, se degrada a su default.
+   */
+  private async setModel(modelId: string) {
+    if (!this.ctx || !this.sessionId) return;
+    try {
+      await this.ctx.request("session/set_config_option", {
+        sessionId: this.sessionId,
+        configId: "model",
+        value: modelId,
+      });
+      this.modelId = modelId;
+      console.log(`[model] sesión ${this.sessionId}: modelo → ${modelId}`);
+    } catch (e) {
+      console.warn(
+        `[model] set_config_option falló (${(e as Error).message}); el agente sigue con su modelo actual`
+      );
+    }
   }
 
   private pump() {
@@ -421,7 +455,7 @@ const summarize = (id: string, s: GooseSession): ConversationSummary => ({
   closed: s.closed,
 });
 
-export async function createConversation() {
+export async function createConversation(modelId?: string) {
   if (conversations.size >= MAX_CONVERSATIONS) {
     throw new Error("too many conversations");
   }
@@ -429,6 +463,10 @@ export async function createConversation() {
   // conversación al instante y ve las fases, en vez de esperar el POST a ciegas.
   const id = randomUUID();
   const s = new GooseSession(WS_URL, TOKEN, CWD);
+  // Selección del Selector de Modelo: queda registrada en la sesión para que
+  // el flujo de inferencia pueda consultarla. El motor final del agente lo
+  // decide su propia configuración dentro de la caja.
+  if (modelId) s.modelId = modelId;
   void s.connect();
   conversations.set(id, s);
   s.on("event", (e: AcpEvent) => {
@@ -459,10 +497,10 @@ export function closeConversation(id: string) {
   return true;
 }
 
-export function askConversation(id: string, text: string) {
+export function askConversation(id: string, text: string, modelId?: string) {
   const s = conversations.get(id);
   if (!s) return false;
-  s.ask(text);
+  s.ask(text, modelId);
   markActivity();
   return true;
 }

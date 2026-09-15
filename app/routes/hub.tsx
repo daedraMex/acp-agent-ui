@@ -8,6 +8,7 @@ import { MainPanelLayout } from "~/components/Layout/MainPanelLayout";
 import { ChatInputCard } from "~/components/ChatInputCard";
 import { ChatInput } from "~/components/ChatInput";
 import { config } from "~/.server/acp";
+import { useModelSelector } from "~/context/ModelContext";
 
 export async function loader() {
   return { cwd: config.cwd, wsUrl: config.wsUrl };
@@ -37,6 +38,7 @@ export default function Hub({ loaderData }: { loaderData: { cwd: string } }) {
   const clock = useClock();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { activeModelId } = useModelSelector();
 
   const greeting = !clock
     ? ""
@@ -51,7 +53,11 @@ export default function Hub({ loaderData }: { loaderData: { cwd: string } }) {
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/conversations", { method: "POST" });
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId: activeModelId }),
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "no se pudo abrir la conversación");
       navigate(`/c/${body.conversationId}`, { state: { firstMessage: text } });

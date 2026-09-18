@@ -1,7 +1,8 @@
 /**
  * Input del chat: textarea que crece, Enter envía y Shift+Enter hace salto de
  * línea. Mientras el agente responde, el botón de enviar se vuelve el de parar.
- * Permite adjuntar imágenes, que viajan como bloques de imagen del ACP.
+ * Permite adjuntar imágenes (botón, drag & drop) que viajan como bloques de
+ * imagen del ACP.
  */
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ImagePlus, Square, X } from "lucide-react";
@@ -28,6 +29,7 @@ export function ChatInput({
 }) {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<ImagePayload[]>([]);
+  const [dragging, setDragging] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -78,8 +80,35 @@ export function ChatInput({
     setImages([]);
   };
 
+  // Drag & drop: mismo camino que el botón de adjuntar. El dragleave salta al
+  // pasar sobre hijos; sólo se apaga cuando el cursor sale de verdad.
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer?.types.includes("Files")) {
+      e.preventDefault();
+      setDragging(true);
+    }
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    pickFiles(e.dataTransfer.files);
+  };
+
   return (
-    <div className="flex flex-col gap-2 p-3">
+    <div
+      className="relative flex flex-col gap-2 p-3"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-surface)]/80">
+          <p className="text-sm font-medium text-[var(--color-primary)]">Suelta la imagen aquí</p>
+        </div>
+      )}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map((img, i) => (

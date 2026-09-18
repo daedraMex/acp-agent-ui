@@ -615,12 +615,6 @@ pre:has(> code.bg-inline-code) {
   margin-bottom: 0 !important;
 }
 
-.dark .user-message-bubble {
-  --code-block-background: #0f1628;
-  background-color: #171d30;
-  color: #d2dae6;
-}
-
 .dark .user-message pre {
   background-color: var(--code-block-background);
 }
@@ -1015,7 +1009,3 @@ pre:has(> code.bg-inline-code) {
    User message bubbles use the inverted bg-text-primary surface,
    which turns light in Aura. Restore Aura's dark chat bubble.
    ═══════════════════════════════════════════════════════════ */
-[data-theme='aura'] .user-message-bubble {
-  background-color: #393647;
-  color: #edecee;
-}

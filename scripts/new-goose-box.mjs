@@ -54,14 +54,18 @@ const exec = async (command, timeoutSeconds = 300) => {
   return r.stdout.trim();
 };
 
-// 3. goose. El instalador oficial deja el binario en GOOSE_BIN_DIR.
+// 3. goose. El release ya no publica download_cli.sh: se baja el tarball
+//    musl de GitHub y se deja el binario en /usr/local/bin.
+const GOOSE_VERSION = process.env.GOOSE_VERSION ?? "v1.51.0";
 console.log(
   "goose",
   await exec(`
 set -e
-export HOME=/root CONFIGURE=false GOOSE_BIN_DIR=/usr/local/bin
-curl -fsSL https://github.com/aaif-goose/goose/releases/latest/download/download_cli.sh -o /tmp/gl.sh
-bash /tmp/gl.sh > /tmp/gl.log 2>&1
+cd /tmp
+curl -fsSL -o goose.tar.gz https://github.com/aaif-goose/goose/releases/download/${GOOSE_VERSION}/goose-x86_64-unknown-linux-musl.tar.gz
+tar xzf goose.tar.gz
+mv goose /usr/local/bin/goose
+chmod 755 /usr/local/bin/goose
 /usr/local/bin/goose --version
 `),
   `(${since()})`

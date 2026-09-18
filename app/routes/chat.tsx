@@ -8,10 +8,12 @@ import type { Route } from "./+types/chat";
 import { MainPanelLayout } from "~/components/Layout/MainPanelLayout";
 import { ChatInputCard } from "~/components/ChatInputCard";
 import { ChatInput } from "~/components/ChatInput";
+import { ChatConfigBar } from "~/components/ChatConfigBar";
 import { Markdown } from "~/components/Markdown";
+import { ToolCalls } from "~/components/ToolCalls";
 import { MessageUsageStats } from "~/components/MessageUsageStats";
 import { ConnectingState } from "~/components/ConnectingState";
-import { useAcpStream, type ToolEntry, type Turn } from "~/hooks/useAcpStream";
+import { useAcpStream, type Turn } from "~/hooks/useAcpStream";
 import { config, getConversation, getMessages } from "~/.server/acp";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -32,6 +34,18 @@ function Bubble({ turn }: { turn: Turn }) {
     return (
       <div className="flex justify-end">
         <div className="max-w-[80%] rounded-2xl rounded-br-md bg-background-inverse px-4 py-2.5 text-sm text-text-inverse">
+          {turn.images && turn.images.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {turn.images.map((img, i) => (
+                <img
+                  key={i}
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  alt={`imagen adjunta ${i + 1}`}
+                  className="max-h-48 max-w-56 rounded-lg object-contain"
+                />
+              ))}
+            </div>
+          )}
           {turn.text}
         </div>
       </div>
@@ -47,53 +61,10 @@ function Bubble({ turn }: { turn: Turn }) {
           </p>
         </details>
       )}
-      {turn.tools && turn.tools.length > 0 && (
-        <ul className="mb-3 flex flex-col gap-1">
-          {turn.tools.map((tool) => (
-            <ToolRow key={tool.id} tool={tool} />
-          ))}
-        </ul>
-      )}
+      {turn.tools && turn.tools.length > 0 && <ToolCalls tools={turn.tools} />}
       {turn.text && <Markdown>{turn.text}</Markdown>}
       {turn.usage && <MessageUsageStats {...turn.usage} />}
     </div>
-  );
-}
-
-// Una herramienta del agente, con su estado según ACP:
-// pending → in_progress → completed | failed.
-const STATUS_ICON: Record<string, string> = {
-  pending: "⏳",
-  in_progress: "●",
-  completed: "✓",
-  failed: "✗",
-};
-
-function ToolRow({ tool }: { tool: ToolEntry }) {
-  const status = tool.status ?? "pending";
-  const color =
-    status === "failed"
-      ? "text-text-danger"
-      : status === "completed"
-        ? "text-text-success"
-        : "text-text-warning";
-  return (
-    <li className="flex min-w-0 items-baseline gap-2 text-xs">
-      <span className={`shrink-0 ${color}`} aria-label={status}>
-        {STATUS_ICON[status] ?? "•"}
-      </span>
-      {tool.kind && (
-        <span className="shrink-0 rounded bg-background-secondary px-1 font-mono text-text-secondary">
-          {tool.kind}
-        </span>
-      )}
-      <span className="min-w-0 truncate text-text-primary">{tool.title ?? tool.id}</span>
-      {tool.path && (
-        <span className="hidden min-w-0 truncate font-mono text-text-tertiary sm:inline">
-          {tool.path}
-        </span>
-      )}
-    </li>
   );
 }
 
@@ -108,7 +79,7 @@ function ChatView() {
   const { id, cwd, messages } = useLoaderData<typeof loader>();
   const location = useLocation();
   const firstMessage = (location.state as { firstMessage?: string } | null)?.firstMessage;
-  const { turns, busy, connected, phase, error, send } = useAcpStream(
+  const { turns, busy, connected, phase, error, send, config, setConfigOption } = useAcpStream(
     id,
     messages as Turn[]
   );
@@ -159,6 +130,7 @@ function ChatView() {
 
         <div className="mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6 sm:pb-6">
           <ChatInputCard>
+            <ChatConfigBar config={config} onSelect={setConfigOption} />
             <ChatInput
               onSubmit={send}
               busy={busy}

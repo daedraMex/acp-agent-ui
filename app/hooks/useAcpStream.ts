@@ -7,17 +7,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** Por dónde va la conexión con el agente antes del primer `started`. */
 export type ConnectPhase = "waking" | "connecting" | "session";
 
+/** Opción de configuración de sesión que el agente anuncia en session/new. */
+export interface ConfigOption {
+  id: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  currentValue?: string | null;
+  values: { value: string; title?: string }[];
+}
+
 export interface ToolEntry {
   id: string;
   title?: string;
   kind?: string;
   status?: string;
   path?: string;
+  input?: unknown;
+  output?: string;
+}
+
+/** Imagen adjunta a un mensaje, tal como la espera el ACP (base64 + mime). */
+export interface ImagePayload {
+  data: string;
+  mimeType: string;
 }
 
 export interface Turn {
   role: "user" | "assistant";
   text: string;
+  images?: ImagePayload[];
   thought?: string;
   tools?: ToolEntry[];
   usage?: { used: number; size: number; cost: number };
@@ -36,6 +55,7 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<ConnectPhase>("waking");
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [config, setConfig] = useState<ConfigOption[]>([]);
   const streaming = useRef(false);
 
   useEffect(() => {
@@ -71,6 +91,7 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
 
     es.addEventListener("started", () => setConnected(true));
     es.addEventListener("status", (e) => setPhase(JSON.parse((e as MessageEvent).data).phase));
+    es.addEventListener("config", (e) => setConfig(JSON.parse((e as MessageEvent).data).options));
     es.addEventListener("chunk", (e) => appendChunk(JSON.parse((e as MessageEvent).data).text));
     es.addEventListener("thought", (e) => appendThought(JSON.parse((e as MessageEvent).data).text));
     es.addEventListener("tool", (e) => upsertTool(JSON.parse((e as MessageEvent).data)));
@@ -101,18 +122,46 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
   }, [conversationId]);
 
   const send = useCallback(
-    async (text: string) => {
-      setTurns((prev) => [...prev, { role: "user", text }]);
+    async (text: string, images?: ImagePayload[]) => {
+      setTurns((prev) => [...prev, { role: "user", text, images }]);
       setBusy(true);
       streaming.current = false;
-      await fetch(`/api/conversations/${conversationId}/messages`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      try {
+        const r = await fetch(`/api/conversations/${conversationId}/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, images }),
+        });
+        if (!r.ok) {
+          const d = (await r.json().catch(() => null)) as { error?: string } | null;
+          setError(d?.error ?? "No se pudo enviar el mensaje");
+          setBusy(false);
+        }
+      } catch {
+        setError("Sin conexión con el servidor");
+        setBusy(false);
+      }
     },
     [conversationId]
   );
 
-  return { turns, busy, connected, phase, error, usage, send };
+  // Cambia una opción (modelo, modo, esfuerzo…) en la sesión del agente.
+  // La respuesta trae todas las opciones ya actualizadas; el SSE además emite
+  // un evento `config` que mantiene sincronizadas otras pestañas.
+  const setConfigOption = useCallback(
+    async (optionId: string, value: string) => {
+      const r = await fetch(`/api/conversations/${conversationId}/config`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ optionId, value }),
+      });
+      if (r.ok) {
+        const d = (await r.json()) as { options?: ConfigOption[] };
+        if (Array.isArray(d.options)) setConfig(d.options);
+      }
+    },
+    [conversationId]
+  );
+
+  return { turns, busy, connected, phase, error, usage, config, setConfigOption, send };
 }

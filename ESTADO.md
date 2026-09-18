@@ -6,15 +6,16 @@
 ## Lo que funciona hoy
 
 Un turno completo desde el navegador: llega al agente, el agente escribe en el disco de su caja,
-responde en markdown y reporta tokens y costo. Verificado el 31 de agosto con
-`/root/web3-ok.txt` → `WEB3_OK`.
+responde en markdown y reporta tokens y costo. **Las imágenes se mandan como bloques ACP estándar y el
+agente las ve** (verificado 17 sep con un círculo rojo sobre fondo azul).
 
 | Pieza | Dónde | Estado |
 |---|---|---|
 | Interfaz | la raíz de este repo | ✅ SSR, 9 rutas |
 | Motor ACP | `app/.server/acp.ts` | ✅ una conexión por conversación |
 | SSE | `app/routes/api.conversations.$id.events.ts` | ✅ con latido cada 25 s |
-| Agente | caja `goose-demo` (`sb_af93745a-…`), goose 1.48.0 | ✅ `goose-acp.service` |
+| Agente | caja `agente-goose` (`sb_ca6d7dd0-…`), goose 1.51.0 | ✅ `goose-acp.service` |
+| LLM | DeepSeek directo (`api.deepseek.com`), `deepseek-chat`/`deepseek-flash` | ✅ con visión (`deepseek-flash`) |
 | Repo | [blissito/acp-agent-ui](https://github.com/blissito/acp-agent-ui) | público |
 
 ## Para arrancar
@@ -34,6 +35,19 @@ en ~25 s (crear, instalar goose, LLM = EasyBits, `/data/work`, unidad, expose) y
 desapareció del host sin aviso (404 "sandbox not found") mientras figuraba `running`.
 
 ## Lo que hay que saber
+
+- **EasyBits inyecta `OPENAI_BASE_URL=https://www.easybits.cloud/api/v2/compute/v1` + `OPENAI_API_KEY` como
+  ambiente en los dev-boxes.** Ghosty se niega a mandar credenciales ambientales a endpoints custom
+  ("must be bound explicitly"), así que una caja ghosty reanudada por sandbox-agent muere en cada turno
+  si no se relanza con `env -u OPENAI_BASE_URL -u OPENAI_API_KEY`. La unidad de goose está blindada:
+  sus `EnvironmentFile` pisan las ambientales.
+
+- **Visión por DeepSeek.** `deepseek-flash` (el `deepseek-chat` actual) es multimodal y ve imágenes;
+  goose le pasa los bloques `image` del ACP tal cual. Cuando un mensaje trae imágenes, el server cambia
+  solo al modelo con visión de la familia (`ensureVisionModel` en `acp.ts`). La caja vieja de ghosty
+  (`agente-acp`) queda suspendida como respaldo; ghosty ignoraba los bloques `image` y exigía el
+  workaround de subir la imagen al workspace + `resource_link` (sigue en `acp.ts`, activado por el
+  nombre del agente).
 
 - **Las herramientas y el pensamiento se ven.** `tool_call` / `tool_call_update` llegan al
   navegador como evento `tool` (upsert por id) y `agent_thought_chunk` como `thought`; el chat

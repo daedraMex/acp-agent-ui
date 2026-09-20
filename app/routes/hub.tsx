@@ -7,10 +7,15 @@ import { useNavigate } from "react-router";
 import { MainPanelLayout } from "~/components/Layout/MainPanelLayout";
 import { ChatInputCard } from "~/components/ChatInputCard";
 import { ChatInput } from "~/components/ChatInput";
-import { config } from "~/.server/acp";
+import { cn } from "~/lib/utils";
+import { config, hubState } from "~/.server/acp";
+import type { ImagePayload } from "~/hooks/useAcpStream";
 
 export async function loader() {
-  return { cwd: config.cwd, wsUrl: config.wsUrl };
+  // Sin sesión abierta no se puede preguntar al agente por sus modelos (ACP no
+  // tiene forma de listarlos sin sesión), así que el selector se pinta con el
+  // último catálogo conocido. Se refresca solo al abrir cualquier hilo.
+  return { cwd: config.cwd, wsUrl: config.wsUrl, hub: hubState() };
 }
 
 function useClock() {
@@ -32,11 +37,17 @@ function useClock() {
   };
 }
 
-export default function Hub({ loaderData }: { loaderData: { cwd: string } }) {
+export default function Hub({
+  loaderData,
+}: {
+  loaderData: { cwd: string; hub: { models: { value: string; name: string }[]; currentModel: string | null } };
+}) {
   const navigate = useNavigate();
   const clock = useClock();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { models, currentModel: modeloGuardado } = loaderData.hub;
+  const [modelo, setModelo] = useState(modeloGuardado);
 
   const greeting = !clock
     ? ""
@@ -46,15 +57,22 @@ export default function Hub({ loaderData }: { loaderData: { cwd: string } }) {
         ? "Buenas tardes"
         : "Buenas noches";
 
-  const handleSubmit = async (text: string) => {
+  const handleSubmit = async (text: string, images: ImagePayload[] = []) => {
     if (creating) return;
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/conversations", { method: "POST" });
+      // El turno viaja EN la creación: así la conversación nace con su primer
+      // mensaje puesto y el chat lo pinta al primer render, sin depender de que
+      // el navegador cargue una ruta para reenviarlo.
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, images }),
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "no se pudo abrir la conversación");
-      navigate(`/c/${body.conversationId}`, { state: { firstMessage: text } });
+      navigate(`/c/${body.conversationId}`);
     } catch (e) {
       setError((e as Error).message);
       setCreating(false);
@@ -75,20 +93,30 @@ export default function Hub({ loaderData }: { loaderData: { cwd: string } }) {
           </div>
           <p className="mb-6 text-xl text-text-secondary">{greeting}</p>
 
+
           <ChatInputCard>
             <ChatInput
               onSubmit={handleSubmit}
               busy={creating}
               workingDir={loaderData.cwd}
+              withImages
+              models={models}
+              currentModel={modelo}
+              onModelChange={(v) => {
+                setModelo(v);
+                void fetch("/api/model", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ value: v }),
+                });
+              }}
               placeholder="Pídele algo al agente que vive en la caja…"
             />
           </ChatInputCard>
 
           {error && <p className="mt-3 text-sm text-text-danger">{error}</p>}
           {creating && (
-            <p className="mt-3 text-sm text-text-secondary">
-              Despertando la caja del agente…
-            </p>
+            <p className="mt-3 text-sm text-text-secondary">Abriendo la conversación…</p>
           )}
         </div>
       </div>

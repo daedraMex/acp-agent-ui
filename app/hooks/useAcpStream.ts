@@ -17,6 +17,18 @@ export interface ConfigOption {
   values: { value: string; title?: string }[];
 }
 
+/** Un modelo que el agente ofrece para la sesión (selector ACP). */
+export interface ModelOption {
+  value: string;
+  name: string;
+}
+
+/** Imagen adjunta a un mensaje, tal como la espera el ACP (base64 + mime). */
+export interface ImagePayload {
+  data: string;
+  mimeType: string;
+}
+
 export interface ToolEntry {
   id: string;
   title?: string;
@@ -25,12 +37,6 @@ export interface ToolEntry {
   path?: string;
   input?: unknown;
   output?: string;
-}
-
-/** Imagen adjunta a un mensaje, tal como la espera el ACP (base64 + mime). */
-export interface ImagePayload {
-  data: string;
-  mimeType: string;
 }
 
 export interface Turn {
@@ -48,18 +54,30 @@ export interface Usage {
   cost: number;
 }
 
-export function useAcpStream(conversationId: string, initial: Turn[] = []) {
+export interface AcpStreamOpts {
+  /** La conexión murió: el hilo sigue en la caja y se puede reabrir. */
+  onDisconnected?: () => void;
+}
+
+export function useAcpStream(
+  conversationId: string,
+  initial: Turn[] = [],
+  opts: AcpStreamOpts = {}
+) {
   const [turns, setTurns] = useState<Turn[]>(initial);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [phase, setPhase] = useState<ConnectPhase>("waking");
   const [usage, setUsage] = useState<Usage | null>(null);
   const [config, setConfig] = useState<ConfigOption[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
   const streaming = useRef(false);
 
   useEffect(() => {
-    const es = new EventSource(`/api/conversations/${conversationId}/events`);
+    const es = new EventSource(`/api/conversations/${encodeURIComponent(conversationId)}/events`);
 
     // Todo lo que llega durante un turno (texto, pensamiento, herramientas)
     // cae en el mismo mensaje del asistente; si aún no existe, se crea.
@@ -90,6 +108,14 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
       });
 
     es.addEventListener("started", () => setConnected(true));
+    es.addEventListener("models", (e) => {
+      const m = JSON.parse((e as MessageEvent).data) as {
+        options: ModelOption[];
+        current: string | null;
+      };
+      setModels(m.options ?? []);
+      setCurrentModel(m.current ?? null);
+    });
     es.addEventListener("status", (e) => setPhase(JSON.parse((e as MessageEvent).data).phase));
     es.addEventListener("config", (e) => setConfig(JSON.parse((e as MessageEvent).data).options));
     es.addEventListener("chunk", (e) => appendChunk(JSON.parse((e as MessageEvent).data).text));
@@ -109,6 +135,10 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
       streaming.current = false;
       setBusy(false);
     });
+    es.addEventListener("warning", (e) => {
+      const data = (e as MessageEvent).data;
+      if (data) setNotice(JSON.parse(data).message);
+    });
     es.addEventListener("error", (e) => {
       const data = (e as MessageEvent).data;
       if (data) setError(JSON.parse(data).message);
@@ -116,10 +146,13 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
     es.addEventListener("closed", () => {
       setConnected(false);
       es.close();
+      // El socket murió, no el hilo: quien mira esta página tiene que poder
+      // seguir leyéndolo y reabrirlo, no quedarse con un error rojo.
+      opts.onDisconnected?.();
     });
 
     return () => es.close();
-  }, [conversationId]);
+  }, [conversationId, opts.onDisconnected]);
 
   const send = useCallback(
     async (text: string, images?: ImagePayload[]) => {
@@ -127,7 +160,7 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
       setBusy(true);
       streaming.current = false;
       try {
-        const r = await fetch(`/api/conversations/${conversationId}/messages`, {
+        const r = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ text, images }),
@@ -163,5 +196,32 @@ export function useAcpStream(conversationId: string, initial: Turn[] = []) {
     [conversationId]
   );
 
-  return { turns, busy, connected, phase, error, usage, config, setConfigOption, send };
+  const setModel = useCallback(
+    async (value: string) => {
+      // Optimista: el SSE confirma el valor real cuando el agente responde.
+      setCurrentModel(value);
+      await fetch(`/api/conversations/${conversationId}/model`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+    },
+    [conversationId]
+  );
+
+  return {
+    turns,
+    busy,
+    connected,
+    phase,
+    error,
+    notice,
+    usage,
+    config,
+    setConfigOption,
+    models,
+    currentModel,
+    setModel,
+    send,
+  };
 }

@@ -7,10 +7,13 @@ import {
 
 export default [
   // Rutas de recurso: la API que consume el navegador (SSE incluido).
+  route("api/model", "routes/api.model.ts"),
   route("api/conversations", "routes/api.conversations.ts"),
   route("api/conversations/:id/events", "routes/api.conversations.$id.events.ts"),
   route("api/conversations/:id/messages", "routes/api.conversations.$id.messages.ts"),
   route("api/conversations/:id/config", "routes/api.conversations.$id.config.ts"),
+  route("api/conversations/:id/model", "routes/api.conversations.$id.model.ts"),
+  route("api/agent-sessions", "routes/api.agent-sessions.ts"),
 
   layout("routes/_shell.tsx", [
     index("routes/hub.tsx"),

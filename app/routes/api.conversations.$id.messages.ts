@@ -4,6 +4,7 @@ import type { Route } from "./+types/api.conversations.$id.messages";
 import { askConversation } from "~/.server/acp";
 import type { ImagePayload } from "~/hooks/useAcpStream";
 
+
 const MAX_IMAGES = 4;
 // ~15 MB por imagen en base64 (4/3 del binario).
 const MAX_IMAGE_B64 = 20_000_000;
@@ -13,7 +14,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     text?: string;
     images?: ImagePayload[];
   } | null;
-  const text = body?.text ? String(body.text) : "";
+  const text = body?.text ? String(body.text).trim() : "";
   const images = Array.isArray(body?.images) ? body.images : [];
   if (!text && images.length === 0) {
     return data({ error: "el mensaje está vacío" }, { status: 400 });
@@ -34,6 +35,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       }, { status: 400 });
     }
   }
+
 
   const ok = askConversation(params.id, text, images);
   if (!ok) return data({ error: "conversation not found" }, { status: 404 });

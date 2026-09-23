@@ -1,22 +1,25 @@
 # Dónde estamos
 
-> Actualizado el 2 de septiembre de 2026. Este archivo es la foto operativa: qué corre, dónde, y qué
+> Actualizado el 22 de septiembre de 2026. Este archivo es la foto operativa: qué corre, dónde, y qué
 > hay que saber para retomar sin releer todo. Lo conceptual va en [`docs/`](docs/).
 
 ## Lo que funciona hoy
 
-Un turno completo desde el navegador: llega al agente, el agente escribe en el disco de su caja,
-responde en markdown y reporta tokens y costo. **Las imágenes se mandan como bloques ACP estándar y el
-agente las ve** (verificado 17 sep con un círculo rojo sobre fondo azul).
+Un turno completo desde el navegador: llega al agente, responde en markdown y reporta tokens y costo.
+**Las imágenes van como bloques ACP estándar y el agente las ve** (auto-switch a `deepseek-flash` con
+ida y vuelta al terminar el turno). La **memoria la tiene el agente**: `session/list`/`session/load`,
+una sola sesión viva, respaldo del `sessions.db` con `scripts/backup-sessions.mjs`/`restore-sessions.mjs`,
+títulos y catálogo de modelos recordados en `.data/`.
 
 | Pieza | Dónde | Estado |
 |---|---|---|
-| Interfaz | la raíz de este repo | ✅ SSR, 9 rutas |
-| Motor ACP | `app/.server/acp.ts` | ✅ una conexión por conversación |
-| SSE | `app/routes/api.conversations.$id.events.ts` | ✅ con latido cada 25 s |
+| Interfaz | la raíz de este repo | ✅ SSR, rutas del hub/chat/sessions |
+| Motor ACP | `app/.server/acp.ts` | ✅ una sola sesión viva, agente como fuente de verdad |
+| SSE | `app/routes/api.conversations.$id.events.ts` | ✅ con latido y replay para recargas |
 | Agente | caja `agente-goose` (`sb_ca6d7dd0-…`), goose 1.51.0 | ✅ `goose-acp.service` |
 | LLM | DeepSeek directo (`api.deepseek.com`), `deepseek-chat`/`deepseek-flash` | ✅ con visión (`deepseek-flash`) |
-| Repo | [blissito/acp-agent-ui](https://github.com/blissito/acp-agent-ui) | público |
+| Respaldo | `scripts/backup-sessions.mjs` + `restore-sessions.mjs` | ✅ `sessions.db` fuera de la caja |
+| Repo | fork `daedraMex/acp-agent-ui`, upstream `blissito/acp-agent-ui` | público |
 
 ## Para arrancar
 

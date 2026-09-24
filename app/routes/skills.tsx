@@ -20,7 +20,7 @@ export default function Skills() {
 
   return (
     <MainPanelLayout>
-      <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <div className="mx-auto w-full max-w-3xl min-h-0 flex-1 overflow-y-auto px-6 py-10">
         <h1 className="text-2xl font-light text-text-primary">Habilidades</h1>
         <p className="mt-1 text-sm text-text-secondary">
           Instrucciones que el agente carga bajo demanda. Las del proyecto viven en el repo y llegan

@@ -12,6 +12,7 @@ import { client } from "@agentclientprotocol/sdk";
 import { createWebSocketStream } from "@agentclientprotocol/sdk/experimental/ws-client";
 import { WebSocket } from "ws";
 import type { ConfigOption, ConnectPhase, ImagePayload, ModelOption } from "~/hooks/useAcpStream";
+import { añadirMensajes, guardarMensajes, leerMensajes, leerVentana, ventanaDe } from "./store";
 
 // Sin URL no se inventa una: un fallback hardcodeado manda la sesión a la caja de otro y el
 // fallo se ve como "el agente no responde" en vez de "te falta configurar esto".
@@ -165,6 +166,14 @@ export type AcpEvent =
   // Por dónde va la conexión, para que la UI no diga "Conectando…" a secas
   // durante los ~15s que tarda despertar una caja dormida.
   | { type: "status"; phase: ConnectPhase }
+  // La cola real del hilo (memoria de la sesión): reconcilia a quien pintó
+  // desde disco antes de que la sesión abriera.
+  | {
+      type: "history";
+      messages: StoredMessage[];
+      hasMore: boolean;
+      nextBefore: number | null;
+    }
   | { type: "closed" };
 
 
@@ -672,6 +681,9 @@ class GooseSession extends EventEmitter {
       this.session = new SesionCruda(this.conn, this.resumeSessionId) as any;
       this.title = pickTitle(this.sessionId, this.messages, this.titleFromAgent);
       recordTitle(this.sessionId, this.title);
+      // El hilo que el agente acaba de re-playar queda en disco: la próxima
+      // lectura no necesita sesión viva. (Fase 1 de la carga por cola.)
+      guardarMensajes(this.sessionId, this.messages);
     } else {
       this.session = await ctx.buildSession({ cwd: this.cwd, mcpServers: [] }).start();
       this.sessionId = this.session.sessionId;
@@ -693,6 +705,9 @@ class GooseSession extends EventEmitter {
     if (this.closed) return;
     this.resetIdle();
     this.messages.push({ role: "user", text, images: images.length ? images : undefined, at: Date.now() });
+    // El turno se persiste en frontera, no por chunk: si el proceso muere a
+    // media respuesta, lo perdido lo trae el próximo replay.
+    if (this.sessionId) añadirMensajes(this.sessionId, [this.messages[this.messages.length - 1]]);
     if (this.messages.length === 1) {
       this.title = (text || "📷 imagen").slice(0, 60);
       recordTitle(this.sessionId, this.title);
@@ -940,7 +955,9 @@ class GooseSession extends EventEmitter {
         await this.reabrirTrasSiesta();
         r = await correrTurno();
       }
-      this.messages.push({ role: "assistant", text: answer, at: Date.now() });
+      const fin: StoredMessage = { role: "assistant", text: answer, at: Date.now() };
+      this.messages.push(fin);
+      if (this.sessionId) añadirMensajes(this.sessionId, [fin]);
       this.updatedAt = Date.now();
       this.emit("event", { type: "done", stopReason: r.stopReason, usage: turnUsage });
       // El turno con imagen terminó: se regresa al modelo que había antes,
@@ -1077,12 +1094,29 @@ const summarize = (s: GooseSession): ConversationSummary => ({
   activo: true,
 });
 
+/** La apertura en curso, si la hay: se serializan para no pisar la ranura. */
+let abriendo: Promise<unknown> | null = null;
+
 /**
  * Deja abierto el hilo pedido y devuelve su sesión. `HILO_NUEVO` abre uno en
  * blanco; cualquier otro id es un `sessionId` del agente y se reabre con
  * `session/load`.
  */
 export async function abrirHilo(id: string): Promise<GooseSession> {
+  // La carga por cola puede pedir dos aperturas a la vez (pintar desde disco
+  // y abrir la sesión en paralelo): se hacen de a una, y el dedupe interno
+  // devuelve la sesión ya abierta a la segunda.
+  while (abriendo) await abriendo.catch(() => {});
+  const p = abrirHiloUno(id);
+  abriendo = p;
+  try {
+    return await p;
+  } finally {
+    if (abriendo === p) abriendo = null;
+  }
+}
+
+async function abrirHiloUno(id: string): Promise<GooseSession> {
   // Ya es el que está abierto: no se toca nada.
   if (actual && !actual.closed) {
     const mismo = id === HILO_NUEVO ? !actual.sessionId : actual.sessionId === id;
@@ -1135,7 +1169,25 @@ function esElActual(id: string) {
 }
 
 export function getMessages(id: string): StoredMessage[] {
-  return esElActual(id) ? (actual?.messages ?? []) : [];
+  if (esElActual(id)) return actual?.messages ?? [];
+  // Sin sesión viva, la copia de disco es el historial: la app lo escribe
+  // conforme lo ve, así que leerlo no despierta la caja.
+  return leerMensajes(id);
+}
+
+// Cuántos mensajes trae el loader al abrir: la cola. El resto se pide por
+// GET /api/conversations/:id/messages?before= cuando el scroll llega arriba.
+export const TAIL_MENSAJES = Math.max(1, Number(process.env.ACP_TAIL_MESSAGES ?? 50) || 50);
+
+/**
+ * La ventana de lectura de un hilo. Con el hilo abierto responde la memoria:
+ * es lo más fresco, un turno en vuelo aún no está en disco. Sin sesión,
+ * responde la copia de disco — leer no despierta la caja.
+ */
+export function getMessagesWindow(id: string, before: number | null, limit: number) {
+  return esElActual(id)
+    ? ventanaDe(actual?.messages ?? [], before, limit)
+    : leerVentana(id, before, limit);
 }
 
 export function askConversation(id: string, text: string, images: ImagePayload[] = []) {
@@ -1176,8 +1228,10 @@ export function subscribe(id: string, onEvent: (e: AcpEvent) => void) {
   const handler = (e: AcpEvent) => onEvent(e);
   s.on("event", handler);
   // Quien llega tarde (recarga, segunda pestaña) no vio el `started` original:
-  // se le repite para que el input no se quede en "Conectando…".
+  // se le repite para que el input no se quede en "Conectando…". Y si pintó
+  // desde disco antes de que la sesión abriera, recibe la cola real.
   if (s.ready && s.sessionId && !s.closed) {
+    onEvent({ type: "history", ...ventanaDe(s.messages, null, TAIL_MENSAJES) });
     onEvent({ type: "started", sessionId: s.sessionId });
     if (s.models.length) {
       onEvent({ type: "models", options: s.models, current: s.currentModel });
@@ -1412,6 +1466,11 @@ try {
   titles = JSON.parse(readFileSync(TITLES_PATH, "utf8"));
 } catch {
   // primera vez, o el archivo se fue con la caja
+}
+
+/** El título que este Cliente guardó de un hilo (no el del agente). */
+export function tituloDe(id: string): string {
+  return titles[id] ?? "";
 }
 
 function recordTitle(sessionId: string | null, title: string) {

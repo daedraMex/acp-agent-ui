@@ -2,7 +2,7 @@
  * La conversación. El loader entrega los mensajes ya ocurridos (por si
  * recargas), y de ahí en adelante el hilo lo alimenta el SSE.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/chat";
 import { MainPanelLayout } from "~/components/Layout/MainPanelLayout";
@@ -15,7 +15,7 @@ import { MessageUsageStats } from "~/components/MessageUsageStats";
 import { ArrowDown } from "lucide-react";
 import { ConnectingState } from "~/components/ConnectingState";
 import { useAcpStream, type ConnectPhase, type Turn } from "~/hooks/useAcpStream";
-import { abrirHilo, config, getMessages } from "~/.server/acp";
+import { abrirHilo, config, getMessagesWindow, HILO_NUEVO, TAIL_MENSAJES, tituloDe } from "~/.server/acp";
 
 const plano = (m: { role: "user" | "assistant"; text: string; images?: any[] }) => ({
   role: m.role,
@@ -24,30 +24,77 @@ const plano = (m: { role: "user" | "assistant"; text: string; images?: any[] }) 
 });
 
 export async function loader({ params }: Route.LoaderArgs) {
-  // Abrir un hilo es cerrar el anterior y cargar éste: hay una sola sesión
-  // viva, así que leerlo y seguirlo son la misma cosa.
-  try {
-    const s = await abrirHilo(params.id);
-    const id = s.sessionId ?? params.id;
-    // El agente le acaba de dar un id al hilo nuevo: la URL pasa a ser ésa.
-    if (params.id !== id) throw redirect(`/c/${id}`);
-    return {
-      id,
-      cwd: config.cwd,
-      title: s.title,
-      messages: getMessages(id).map(plano),
-      error: null as string | null,
-    };
-  } catch (e) {
-    if (e instanceof Response) throw e;
-    return {
-      id: params.id,
-      cwd: config.cwd,
-      title: "No pude abrir el hilo",
-      messages: [],
-      error: (e as Error).message,
-    };
+  const fallo = (e: unknown) => ({
+    id: params.id,
+    cwd: config.cwd,
+    title: "No pude abrir el hilo",
+    messages: [],
+    hasMore: false,
+    nextBefore: null,
+    error: (e as Error).message,
+  });
+
+  // Un hilo nuevo no tiene id propio: hay que esperar a que el agente se lo
+  // dé para redirigir.
+  if (params.id === HILO_NUEVO) {
+    try {
+      const s = await abrirHilo(HILO_NUEVO);
+      const id = s.sessionId ?? HILO_NUEVO;
+      if (params.id !== id) throw redirect(`/c/${id}`);
+      const ventana = getMessagesWindow(id, null, TAIL_MENSAJES);
+      return {
+        id,
+        cwd: config.cwd,
+        title: s.title,
+        messages: ventana.messages.map(plano),
+        hasMore: ventana.hasMore,
+        nextBefore: ventana.nextBefore,
+        error: null as string | null,
+      };
+    } catch (e) {
+      if (e instanceof Response) throw e;
+      return fallo(e);
+    }
   }
+
+  // Carga por cola: para un hilo conocido, pintar YA desde la copia en disco
+  // y abrir la sesión en paralelo. El SSE espera a que esté y el evento
+  // `history` reconcilia la cola con la memoria de la sesión.
+  const ventana = getMessagesWindow(params.id, null, TAIL_MENSAJES);
+
+  // Sin copia en disco (primera vez desde que la app persiste, o hilo vacío):
+  // no hay nada que pintar, así que se espera al replay del agente.
+  if (ventana.messages.length === 0 && !ventana.hasMore) {
+    try {
+      const s = await abrirHilo(params.id);
+      const id = s.sessionId ?? params.id;
+      const fresca = getMessagesWindow(id, null, TAIL_MENSAJES);
+      return {
+        id,
+        cwd: config.cwd,
+        title: s.title,
+        messages: fresca.messages.map(plano),
+        hasMore: fresca.hasMore,
+        nextBefore: fresca.nextBefore,
+        error: null as string | null,
+      };
+    } catch (e) {
+      return fallo(e);
+    }
+  }
+
+  // La apertura corre por su cuenta: si falla, el SSE (que espera por la
+  // sesión) lo hace visible al rato con su propio error.
+  void abrirHilo(params.id).catch(() => {});
+  return {
+    id: params.id,
+    cwd: config.cwd,
+    title: tituloDe(params.id) || "Conversación",
+    messages: ventana.messages.map(plano),
+    hasMore: ventana.hasMore,
+    nextBefore: ventana.nextBefore,
+    error: null as string | null,
+  };
 }
 
 function Bubble({ turn }: { turn: Turn }) {
@@ -159,14 +206,35 @@ function HiloNoDisponible({ mensaje }: { mensaje: string }) {
 }
 
 function ChatView() {
-  const { id, cwd, messages, error: loadError } = useLoaderData<typeof loader>();
-  const { turns, busy, connected, phase, error, notice, send, config, setConfigOption, models, currentModel, setModel } = useAcpStream(
+  const {
     id,
-    messages as Turn[]
-  );
+    cwd,
+    messages,
+    hasMore: hayMas,
+    nextBefore: cursor,
+    error: loadError,
+  } = useLoaderData<typeof loader>();
+  const [abajo, setAbajo] = useState(true);
+  // Carga por cola: el loader trajo los últimos mensajes (quizá desde disco,
+  // sin esperar a la caja); el resto se pide hacia atrás cuando el scroll
+  // llega arriba. La cola real de la sesión reconcilia esta base al abrir.
+  const [hasMore, setHasMore] = useState(hayMas);
+  const [nextBefore, setNextBefore] = useState<number | null>(cursor);
+  const [cargandoViejo, setCargandoViejo] = useState(false);
+  // Altura del scroller antes de anteponer: se usa para anclar la vista.
+  const ancla = useRef<number | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const [abajo, setAbajo] = useState(true);
+  const { turns, busy, connected, phase, error, notice, send, prepend, config, setConfigOption, models, currentModel, setModel } = useAcpStream(
+    id,
+    messages as Turn[],
+    {
+      onHistory: ({ hasMore: mas, nextBefore: nuevoCursor }) => {
+        setHasMore(mas);
+        setNextBefore(nuevoCursor);
+      },
+    }
+  );
 
   const irAbajo = () =>
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -179,11 +247,49 @@ function ChatView() {
     if (abajo) irAbajo();
   }, [turns, abajo]);
 
+  // La página anterior entra ARRIBA: sin compensar, el scroll saltaría y el
+  // lector perdería el sitio. Se mide la altura de antes y se reancla tras el
+  // render (sólo cuando hay una anteposición pendiente).
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el && ancla.current !== null) {
+      el.scrollTop += el.scrollHeight - ancla.current;
+      ancla.current = null;
+    }
+  }, [turns]);
+
+  const cargarAntes = useCallback(async () => {
+    if (cargandoViejo || !hasMore || nextBefore === null) return;
+    setCargandoViejo(true);
+    try {
+      const r = await fetch(
+        `/api/conversations/${encodeURIComponent(id)}/messages?before=${nextBefore}&limit=50`
+      );
+      if (!r.ok) return;
+      const d = (await r.json()) as {
+        messages: Turn[];
+        hasMore: boolean;
+        nextBefore: number | null;
+      };
+      const el = scroller.current;
+      if (el) ancla.current = el.scrollHeight;
+      prepend(d.messages ?? []);
+      setHasMore(d.hasMore);
+      setNextBefore(d.nextBefore);
+    } catch {
+      // Sin conexión: se reintenta al volver a subir el scroll.
+    } finally {
+      setCargandoViejo(false);
+    }
+  }, [cargandoViejo, hasMore, nextBefore, id, prepend]);
+
   // "Abajo" con holgura: a menos de 80 px del final cuenta como estar al día.
+  // Arriba, cerca del borde: se pide la página anterior del historial.
   const alScroll = () => {
     const el = scroller.current;
     if (!el) return;
     setAbajo(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    if (el.scrollTop < 120) void cargarAntes();
   };
 
   return (
@@ -198,6 +304,9 @@ function ChatView() {
               <p className="rounded-xl border border-border-primary px-4 py-3 text-sm text-text-secondary">
                 {loadError}
               </p>
+            )}
+            {cargandoViejo && (
+              <p className="text-center text-xs text-text-tertiary">cargando anteriores…</p>
             )}
             {turns.map((turn, i) => (
               <Bubble key={i} turn={turn} />

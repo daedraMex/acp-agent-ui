@@ -57,6 +57,9 @@ export interface Usage {
 export interface AcpStreamOpts {
   /** La conexión murió: el hilo sigue en la caja y se puede reabrir. */
   onDisconnected?: () => void;
+  /** La cola real del hilo llegó: la base pintada desde disco se reconcilia
+   *  con la memoria de la sesión. */
+  onHistory?: (w: { hasMore: boolean; nextBefore: number | null }) => void;
 }
 
 export function useAcpStream(
@@ -75,9 +78,20 @@ export function useAcpStream(
   const [models, setModels] = useState<ModelOption[]>([]);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
   const streaming = useRef(false);
+  // Cuántos mensajes viejos se antepusieron: la reconciliación de `history`
+  // los conserva y reemplaza sólo la base.
+  const antepuestos = useRef(0);
+  // `history` reconcilia una sola vez por conexión.
+  const reconciliado = useRef(false);
+  const conectado = useRef(false);
+  const cerrado = useRef(false);
 
   useEffect(() => {
     const es = new EventSource(`/api/conversations/${encodeURIComponent(conversationId)}/events`);
+    antepuestos.current = 0;
+    reconciliado.current = false;
+    conectado.current = false;
+    cerrado.current = false;
 
     // Todo lo que llega durante un turno (texto, pensamiento, herramientas)
     // cae en el mismo mensaje del asistente; si aún no existe, se crea.
@@ -107,7 +121,23 @@ export function useAcpStream(
         return { ...t, tools };
       });
 
-    es.addEventListener("started", () => setConnected(true));
+    es.addEventListener("started", () => {
+      setConnected(true);
+      conectado.current = true;
+    });
+    es.addEventListener("history", (e) => {
+      const d = JSON.parse((e as MessageEvent).data) as {
+        messages: Turn[];
+        hasMore: boolean;
+        nextBefore: number | null;
+      };
+      if (reconciliado.current) return;
+      reconciliado.current = true;
+      // La base pintada desde disco se reemplaza por la cola real; lo que el
+      // lector ya paginó hacia arriba se conserva.
+      setTurns((prev) => [...prev.slice(0, antepuestos.current), ...d.messages]);
+      opts.onHistory?.({ hasMore: d.hasMore, nextBefore: d.nextBefore });
+    });
     es.addEventListener("models", (e) => {
       const m = JSON.parse((e as MessageEvent).data) as {
         options: ModelOption[];
@@ -145,17 +175,33 @@ export function useAcpStream(
     });
     es.addEventListener("closed", () => {
       setConnected(false);
+      cerrado.current = true;
       es.close();
       // El socket murió, no el hilo: quien mira esta página tiene que poder
       // seguir leyéndolo y reabrirlo, no quedarse con un error rojo.
       opts.onDisconnected?.();
     });
 
+    // Un 404 (el hilo nunca se abrió) o un corte sin haberse conectado no
+    // llega como evento con nombre: sin esto la pantalla se queda en
+    // "Conectando…" para siempre.
+    es.onerror = () => {
+      if (!conectado.current && !cerrado.current) {
+        setError("El agente no abrió este hilo. ¿Está despierta la caja? Prueba recargar.");
+      }
+    };
+
     return () => es.close();
   }, [conversationId, opts.onDisconnected]);
 
   const send = useCallback(
     async (text: string, images?: ImagePayload[]) => {
+      // Sin sesión abierta el agente no puede recibir el turno: se avisa en vez
+      // de pintarlo y perderlo (la cola real lo pisaría al reconciliar).
+      if (!conectado.current) {
+        setNotice("Todavía estoy conectando con el agente; inténtalo en un momento.");
+        return;
+      }
       setTurns((prev) => [...prev, { role: "user", text, images }]);
       setBusy(true);
       streaming.current = false;
@@ -209,6 +255,13 @@ export function useAcpStream(
     [conversationId]
   );
 
+  // Historia más vieja, pegada delante: la carga por cola pide páginas hacia
+  // atrás y aquí se anteponen sin tocar el turno en curso.
+  const prepend = useCallback((older: Turn[]) => {
+    antepuestos.current += older.length;
+    setTurns((prev) => [...older, ...prev]);
+  }, []);
+
   return {
     turns,
     busy,
@@ -223,5 +276,6 @@ export function useAcpStream(
     currentModel,
     setModel,
     send,
+    prepend,
   };
 }

@@ -5,9 +5,26 @@
  * mantiene abierto mientras el navegador escuche.
  */
 import type { Route } from "./+types/api.conversations.$id.events";
-import { closeSse, openSse, sesionActual, subscribe, type AcpEvent } from "~/.server/acp";
+import { closeSse, HILO_NUEVO, markActivity, openSse, sesionActual, subscribe, type AcpEvent } from "~/.server/acp";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  // La carga por cola pinta desde disco sin esperar a la caja: este SSE puede
+  // llegar antes de que la sesión esté abierta. En vez de un 404 a la primera,
+  // se espera un rato: despertar una caja dormida tarda ~1-10 s.
+  const techo = Date.now() + Number(process.env.ACP_SSE_WAIT_MS ?? 60_000);
+  while (Date.now() < techo && !request.signal.aborted) {
+    const s = sesionActual();
+    const esEste = s
+      ? params.id === HILO_NUEVO
+        ? !s.sessionId
+        : s.sessionId === params.id
+      : false;
+    if (esEste) break;
+    // La espera cuenta como actividad: que el idle no suspenda la caja justo
+    // mientras está despertando.
+    markActivity();
+    await new Promise((r) => setTimeout(r, 200));
+  }
   if (!sesionActual()) {
     return new Response("conversation not found", { status: 404 });
   }
